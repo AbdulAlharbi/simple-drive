@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Prepare database
+        run: bin/rails db:prepare
+        env:
+          RAILS_ENV: test
+
+      - name: Run tests
+        run: bin/rails test
+        env:
+          RAILS_ENV: test
