@@ -1,0 +1,10 @@
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+/db/*.sqlite3
+/db/*.sqlite3-*
+/storage/*
+.env
+.DS_Store
+/config/master.key
