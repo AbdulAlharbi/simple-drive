@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c1012">
+<meta name="color-scheme" content="dark">
 <title>Simple Drive — one API, four interchangeable storage backends</title>
 <meta name="description" content="A Rails blob-storage API with one interface over S3, database, local filesystem and FTP backends — where S3 is spoken in raw HTTP by a from-scratch AWS Signature V4 signer, with no AWS or S3 libraries anywhere.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>&#128190;</text></svg>">
@@ -32,10 +34,14 @@
     --maxw:1140px;
   }
   *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
+  html{
+    scroll-behavior:smooth;scroll-padding-top:76px;
+    -webkit-text-size-adjust:100%;text-size-adjust:100%;
+  }
   body{
     margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
     font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased;
+    overflow-wrap:break-word;
     background-image:
       radial-gradient(900px 520px at 82% -10%, rgba(94,233,160,.055), transparent 62%),
       radial-gradient(760px 460px at 2% 2%, rgba(143,176,196,.05), transparent 60%);
@@ -44,19 +50,21 @@
   .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
   a{color:var(--accent);text-decoration:none}
   a:hover{text-decoration:underline}
-  code,kbd{font-family:var(--mono);font-size:.86em}
+  code,kbd{font-family:var(--mono);font-size:.86em;overflow-wrap:anywhere}
   h1,h2,h3,h4{line-height:1.25;margin:0;letter-spacing:-.02em}
   p{margin:0 0 1em}
   p:last-child{margin-bottom:0}
 
+  .diagram,.tablewrap,pre.sh,pre.rb{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+
   /* ---------- header ---------- */
   header.top{
     position:sticky;top:0;z-index:50;
-    background:rgba(12,16,18,.84);backdrop-filter:blur(12px);
+    background:rgba(12,16,18,.84);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
     border-bottom:1px solid var(--border);
   }
   .top .wrap{display:flex;align-items:center;gap:24px;height:60px}
-  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.025em;font-size:15px;color:var(--text)}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.025em;font-size:15px;color:var(--text);padding:10px 0}
   .brand:hover{text-decoration:none}
   .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(94,233,160,.16);flex:none}
   nav.top-nav{display:flex;gap:20px;margin-left:auto;font-size:13.5px}
@@ -72,7 +80,38 @@
   .btn.primary:hover{background:#7df0b4;color:#08130d}
   .btn svg{width:15px;height:15px;fill:currentColor;flex:none}
   .header-cta{margin-left:20px}
-  @media(max-width:980px){nav.top-nav{display:none}.header-cta{margin-left:auto}}
+  .header-cta .short{display:none}
+  .navtoggle{
+    display:none;align-items:center;justify-content:center;
+    width:42px;height:42px;margin-left:8px;flex:none;
+    background:var(--surface);border:1px solid var(--border-2);border-radius:8px;
+    color:var(--text-dim);cursor:pointer;padding:0;
+  }
+  .navtoggle svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+  .navtoggle .close{display:none}
+  header.top.open .navtoggle{color:var(--accent);border-color:var(--accent-dim)}
+  header.top.open .navtoggle .open{display:none}
+  header.top.open .navtoggle .close{display:block}
+
+  @media(max-width:980px){
+    .navtoggle{display:inline-flex}
+    .header-cta{margin-left:auto}
+    .header-cta .full{display:none}
+    .header-cta .short{display:inline}
+    nav.top-nav{
+      display:none;position:absolute;left:0;right:0;top:100%;
+      flex-direction:column;gap:0;margin:0;padding:6px 0 10px;
+      background:var(--bg);
+      border-bottom:1px solid var(--border);font-size:15px;
+      max-height:calc(100dvh - 60px);overflow-y:auto;
+    }
+    header.top.open nav.top-nav{display:flex}
+    nav.top-nav a{
+      padding:13px 24px;color:var(--text);min-height:46px;display:flex;align-items:center;
+      border-bottom:1px solid rgba(36,49,56,.7);
+    }
+    nav.top-nav a:last-child{border-bottom:none}
+  }
 
   /* ---------- sections ---------- */
   section{padding:76px 0;border-top:1px solid var(--border)}
@@ -106,21 +145,23 @@
 
   /* ---------- cards ---------- */
   .grid{display:grid;gap:16px}
+  .grid>*,.steps>*,.stats>*{min-width:0}
   .g3{grid-template-columns:repeat(3,1fr)}
   .g2{grid-template-columns:repeat(2,1fr)}
   @media(max-width:960px){.g3{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:680px){.g3,.g2{grid-template-columns:1fr}}
   .card{
     background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-    padding:22px;display:flex;flex-direction:column;
+    padding:22px;display:flex;flex-direction:column;min-width:0;
   }
+  .card>*{min-width:0}
   .card h3{font-size:16.5px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
   .card p{font-size:14.5px;color:var(--text-dim)}
   .card .role{
     font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;
     color:var(--text-faint);margin-bottom:9px;
   }
-  .file{font-family:var(--mono);font-size:11.5px;color:var(--text-faint);margin-top:auto;padding-top:14px;word-break:break-all}
+  .file,.card p.file{font-family:var(--mono);font-size:11.5px;color:var(--text-faint);margin-top:auto;padding-top:14px;word-break:break-word}
   .badge{
     font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
     padding:3px 8px;border-radius:5px;white-space:nowrap;
@@ -186,7 +227,7 @@
   .stat .sub{font-size:11.5px;color:var(--text-faint);margin-top:7px;font-family:var(--mono)}
 
   /* ---------- code ---------- */
-  .codebox{position:relative}
+  .codebox{position:relative;min-width:0}
   pre.sh,pre.rb{
     background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);
     padding:18px 20px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.8;
@@ -199,7 +240,9 @@
   pre.rb .kw{color:var(--accent)}
   pre.rb .s{color:var(--amber)}
   .copy{
-    position:absolute;top:10px;right:10px;
+    /* z-index: a masked <pre> paints in the z-index:0 layer, which would
+       otherwise cover this later-in-DOM-order sibling button. */
+    position:absolute;top:10px;right:10px;z-index:2;
     font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
     padding:5px 10px;border-radius:6px;cursor:pointer;
     background:var(--surface);border:1px solid var(--border-2);color:var(--text-dim);
@@ -208,7 +251,7 @@
   .copy.done{color:var(--accent);border-color:var(--accent-dim)}
 
   /* ---------- honesty ---------- */
-  .honest{background:var(--bg-2);border:1px solid var(--border-2);border-radius:var(--radius);padding:24px 26px}
+  .honest{background:var(--bg-2);border:1px solid var(--border-2);border-radius:var(--radius);padding:24px 26px;min-width:0}
   .honest h3{font-size:16px;font-weight:600;margin-bottom:6px}
   .honest ul{margin:14px 0 0;padding-left:20px;font-size:14px;color:var(--text-dim)}
   .honest li{margin-bottom:9px}
@@ -233,7 +276,7 @@
   @media(max-width:820px){.steps{grid-template-columns:1fr}}
   .step{
     background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-    padding:20px 22px;display:flex;flex-direction:column;
+    padding:20px 22px;display:flex;flex-direction:column;min-width:0;
   }
   .step .n{
     font-family:var(--mono);font-size:11px;font-weight:600;color:var(--amber);
@@ -241,7 +284,7 @@
   }
   .step h3{font-size:16px;font-weight:600;margin-bottom:8px}
   .step p{font-size:14px;color:var(--text-dim)}
-  .seam{
+  .seam,.step p.seam{
     margin-top:auto;padding-top:14px;font-size:12.5px;color:var(--text-faint);
     border-top:1px solid var(--border);
   }
@@ -250,6 +293,86 @@
 
   footer{border-top:1px solid var(--border);padding:36px 0 52px;color:var(--text-faint);font-size:13.5px}
   footer .wrap{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}
+
+  /* ================= phones ================= */
+  @media(max-width:760px){
+    body{font-size:15.5px;line-height:1.6}
+    .wrap{
+      padding-left:max(18px, env(safe-area-inset-left));
+      padding-right:max(18px, env(safe-area-inset-right));
+    }
+    .top .wrap{gap:10px;height:56px}
+    nav.top-nav a{padding-left:max(18px, env(safe-area-inset-left));padding-right:max(18px, env(safe-area-inset-right))}
+    html{scroll-padding-top:68px}
+
+    section{padding:52px 0}
+    .hero{padding:44px 0 42px}
+    .hero h1{margin-bottom:16px}
+    .pitch{font-size:16.5px;margin-bottom:24px}
+    h2.sec{font-size:23px;margin-bottom:12px}
+    .lede{font-size:15.5px}
+    .sec-head{margin-bottom:28px}
+
+    /* full-width tap targets for the two hero actions */
+    .hero-cta{gap:10px}
+    .hero-cta .btn{flex:1 1 100%;justify-content:center;padding:12px 16px;font-size:14.5px}
+    .chip{padding:7px 12px;font-size:12.5px}
+
+    .card,.step{padding:18px}
+    .honest{padding:20px 18px}
+    .honest ul{padding-left:18px;font-size:13.5px}
+    .rule,.banner{padding:14px 16px;font-size:14px}
+    .card h3,.step h3{font-size:15.5px}
+
+    /* diagrams: fit the width, scroll only when they truly cannot */
+    .diagram{padding:16px 12px}
+    .diagram pre.mermaid svg{max-width:100%;height:auto}
+    .mermaid-fallback{font-size:11px}
+    .cap{font-size:12.5px;margin-top:12px}
+
+    /* a soft right edge is the only cue a touch device gets that
+       a code block, table or diagram continues past the fold */
+    .can-scroll-x{
+      -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 36px),transparent);
+      mask-image:linear-gradient(to right,#000 calc(100% - 36px),transparent);
+    }
+
+    /* code: smaller so the common lines fit, still scrollable */
+    pre.sh,pre.rb{padding:16px 14px;font-size:11.5px;line-height:1.75}
+    .copy{padding:7px 11px;font-size:11px;top:8px;right:8px}
+
+    /* 2-column table wraps instead of forcing a 640px scroll */
+    table{min-width:0;font-size:13px}
+    th,td{padding:10px 11px}
+
+    .stats{grid-template-columns:repeat(2,1fr);gap:10px}
+    .stat{padding:14px}
+    .stat .v{font-size:19px}
+    .stat .k{font-size:12px}
+    .stat .sub{font-size:11px}
+
+    footer{padding:28px 0 40px}
+    footer .wrap{flex-direction:column;gap:10px}
+  }
+
+  @media(max-width:400px){
+    .wrap{
+      padding-left:max(15px, env(safe-area-inset-left));
+      padding-right:max(15px, env(safe-area-inset-right));
+    }
+    .hero h1{font-size:34px}
+    h2.sec{font-size:21px}
+    pre.sh,pre.rb{font-size:10.8px}
+    .stats{grid-template-columns:1fr}
+    .stat .v{font-size:22px}
+  }
+
+  /* pointer-coarse: don't leave hover-only affordances on touch devices */
+  @media(hover:none){
+    .btn:hover,.copy:hover{border-color:var(--border-2);color:var(--text)}
+    .btn.primary:hover{background:var(--accent);color:#08130d}
+    .navtoggle,.copy,.btn{-webkit-tap-highlight-color:rgba(94,233,160,.18)}
+  }
 </style>
 </head>
 <body>
@@ -257,7 +380,7 @@
 <header class="top">
   <div class="wrap">
     <a class="brand" href="#top"><span class="dot"></span>Simple&nbsp;Drive</a>
-    <nav class="top-nav">
+    <nav class="top-nav" id="site-nav">
       <a href="#problem">Problem</a>
       <a href="#architecture">Architecture</a>
       <a href="#sigv4">SigV4 signer</a>
@@ -268,8 +391,12 @@
     </nav>
     <a class="btn header-cta" href="https://github.com/AbdulAlharbi/simple-drive" target="_blank" rel="noopener">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-      AbdulAlharbi/simple-drive
+      <span class="full">AbdulAlharbi/simple-drive</span><span class="short">GitHub</span>
     </a>
+    <button class="navtoggle" id="navtoggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
+      <svg class="open" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      <svg class="close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
   </div>
 </header>
 
@@ -1031,6 +1158,69 @@ flowchart TB
 </footer>
 
 <script>
+  // Mobile menu. The nav is a dropdown panel below 980px; above that the
+  // toggle is hidden and the panel rule never applies.
+  (function () {
+    var header = document.querySelector('header.top');
+    var btn = document.getElementById('navtoggle');
+    var nav = document.getElementById('site-nav');
+    if (!header || !btn || !nav) return;
+
+    function setOpen(open) {
+      header.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', String(open));
+      btn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    btn.addEventListener('click', function () {
+      setOpen(!header.classList.contains('open'));
+    });
+
+    // Any in-page jump closes the panel so the target section is visible.
+    nav.addEventListener('click', function (e) {
+      if (e.target.closest('a')) setOpen(false);
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!header.contains(e.target)) setOpen(false);
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') setOpen(false);
+    });
+
+    // Leaving mobile width must not strand the panel in the open state.
+    window.matchMedia('(min-width: 981px)').addEventListener('change', function (m) {
+      if (m.matches) setOpen(false);
+    });
+  })();
+</script>
+
+<script>
+  // Marks the horizontally scrollable boxes that still have content to the
+  // right. The CSS only acts on the class below 760px.
+  (function () {
+    var boxes = Array.prototype.slice.call(
+      document.querySelectorAll('.diagram, .tablewrap, pre.sh, pre.rb')
+    );
+    function update(el) {
+      var more = el.scrollWidth - el.clientWidth - el.scrollLeft > 4;
+      el.classList.toggle('can-scroll-x', more);
+    }
+    function updateAll() { boxes.forEach(update); }
+
+    boxes.forEach(function (el) {
+      el.addEventListener('scroll', function () { update(el); }, { passive: true });
+    });
+    window.addEventListener('resize', updateAll);
+    window.addEventListener('orientationchange', updateAll);
+    // Diagrams change width when mermaid finishes, so it re-runs this.
+    window.__updateScrollHints = updateAll;
+    updateAll();
+  })();
+</script>
+
+<script>
   // Copy-to-clipboard for the runnable snippets.
   document.querySelectorAll('[data-copy]').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -1054,6 +1244,19 @@ flowchart TB
   // diagram falls back to its hand-written text version.
   const styles = getComputedStyle(document.documentElement);
   const v = n => styles.getPropertyValue(n).trim();
+
+  // On a phone a left-to-right flowchart renders several times wider than the
+  // screen, so it is re-laid-out top-to-bottom and scaled to the container
+  // instead of forcing a long horizontal scroll.
+  const narrow = window.matchMedia('(max-width: 760px)').matches;
+  if (narrow) {
+    document.querySelectorAll('pre.mermaid').forEach(el => {
+      // innerHTML, not textContent: the labels contain real <br> elements
+      // that textContent would flatten into run-together words.
+      el.innerHTML = el.innerHTML.replace(/^(\s*)flowchart\s+LR\b/m, '$1flowchart TB');
+    });
+  }
+
   try {
     const { default: mermaid } = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
     mermaid.initialize({
@@ -1061,8 +1264,12 @@ flowchart TB
       securityLevel: 'strict',
       theme: 'base',
       fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
-      flowchart: { curve: 'basis', padding: 14, nodeSpacing: 34, rankSpacing: 42, useMaxWidth: false },
-      er: { useMaxWidth: false },
+      flowchart: {
+        curve: 'basis', padding: narrow ? 8 : 14,
+        nodeSpacing: narrow ? 22 : 34, rankSpacing: narrow ? 30 : 42,
+        useMaxWidth: narrow
+      },
+      er: { useMaxWidth: narrow },
       themeVariables: {
         background: v('--bg-2'),
         primaryColor: v('--surface-2'),
@@ -1078,7 +1285,7 @@ flowchart TB
         edgeLabelBackground: v('--bg-2'),
         attributeBackgroundColorOdd: v('--surface'),
         attributeBackgroundColorEven: v('--bg-2'),
-        fontSize: '13px'
+        fontSize: narrow ? '12px' : '13px'
       }
     });
     await mermaid.run({ querySelector: 'pre.mermaid' });
@@ -1086,6 +1293,7 @@ flowchart TB
     console.error('Mermaid failed to render, showing text fallback:', err);
     document.querySelectorAll('[data-diagram]').forEach(d => d.classList.add('failed'));
   }
+  if (window.__updateScrollHints) window.__updateScrollHints();
 </script>
 </body>
 </html>
