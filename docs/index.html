@@ -1,0 +1,1091 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simple Drive — one API, four interchangeable storage backends</title>
+<meta name="description" content="A Rails blob-storage API with one interface over S3, database, local filesystem and FTP backends — where S3 is spoken in raw HTTP by a from-scratch AWS Signature V4 signer, with no AWS or S3 libraries anywhere.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>&#128190;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c1012;
+    --bg-2:#10161a;
+    --surface:#141c20;
+    --surface-2:#1a242a;
+    --border:#243138;
+    --border-2:#34464f;
+    --text:#dde6e9;
+    --text-dim:#94a8b2;
+    --text-faint:#647883;
+    --accent:#5ee9a0;
+    --accent-dim:#2f7d58;
+    --steel:#8fb0c4;
+    --steel-dim:#3d576a;
+    --amber:#f0b755;
+    --rust:#f28b7d;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --radius:10px;
+    --maxw:1140px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+    font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(900px 520px at 82% -10%, rgba(94,233,160,.055), transparent 62%),
+      radial-gradient(760px 460px at 2% 2%, rgba(143,176,196,.05), transparent 60%);
+    background-repeat:no-repeat;
+  }
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,kbd{font-family:var(--mono);font-size:.86em}
+  h1,h2,h3,h4{line-height:1.25;margin:0;letter-spacing:-.02em}
+  p{margin:0 0 1em}
+  p:last-child{margin-bottom:0}
+
+  /* ---------- header ---------- */
+  header.top{
+    position:sticky;top:0;z-index:50;
+    background:rgba(12,16,18,.84);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--border);
+  }
+  .top .wrap{display:flex;align-items:center;gap:24px;height:60px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.025em;font-size:15px;color:var(--text)}
+  .brand:hover{text-decoration:none}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(94,233,160,.16);flex:none}
+  nav.top-nav{display:flex;gap:20px;margin-left:auto;font-size:13.5px}
+  nav.top-nav a{color:var(--text-dim);font-weight:500}
+  nav.top-nav a:hover{color:var(--accent);text-decoration:none}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;padding:8px 15px;border-radius:8px;
+    font-size:13.5px;font-weight:600;border:1px solid var(--border-2);
+    color:var(--text);background:var(--surface);white-space:nowrap;
+  }
+  .btn:hover{border-color:var(--accent-dim);color:var(--accent);text-decoration:none}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#08130d}
+  .btn.primary:hover{background:#7df0b4;color:#08130d}
+  .btn svg{width:15px;height:15px;fill:currentColor;flex:none}
+  .header-cta{margin-left:20px}
+  @media(max-width:980px){nav.top-nav{display:none}.header-cta{margin-left:auto}}
+
+  /* ---------- sections ---------- */
+  section{padding:76px 0;border-top:1px solid var(--border)}
+  section:first-of-type{border-top:none}
+  .eyebrow{
+    font-family:var(--mono);font-size:11.5px;font-weight:500;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--accent);margin-bottom:14px;
+  }
+  .eyebrow.steel{color:var(--steel)}
+  .eyebrow.amber{color:var(--amber)}
+  h2.sec{font-size:29px;font-weight:700;margin-bottom:14px;letter-spacing:-.03em}
+  .lede{color:var(--text-dim);font-size:16.5px;max-width:76ch}
+  .lede strong{color:var(--text);font-weight:600}
+  .sec-head{margin-bottom:38px}
+
+  /* ---------- hero ---------- */
+  .hero{padding:84px 0 66px;border-top:none}
+  .hero h1{font-size:clamp(38px,6.2vw,62px);font-weight:700;letter-spacing:-.04em;margin-bottom:20px}
+  .hero h1 .accent{color:var(--accent)}
+  .pitch{font-size:19px;color:var(--text-dim);max-width:70ch;margin-bottom:30px}
+  .pitch strong{color:var(--text);font-weight:600}
+  .hero-cta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:32px}
+  .chips{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{
+    display:inline-flex;align-items:center;gap:9px;
+    background:var(--surface);border:1px solid var(--border);border-radius:999px;
+    padding:8px 15px;font-size:13px;color:var(--text-dim);
+  }
+  .chip b{color:var(--text);font-family:var(--mono);font-weight:600;font-size:13px}
+  .chip .pip{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none}
+
+  /* ---------- cards ---------- */
+  .grid{display:grid;gap:16px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:960px){.g3{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:680px){.g3,.g2{grid-template-columns:1fr}}
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:22px;display:flex;flex-direction:column;
+  }
+  .card h3{font-size:16.5px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .card p{font-size:14.5px;color:var(--text-dim)}
+  .card .role{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--text-faint);margin-bottom:9px;
+  }
+  .file{font-family:var(--mono);font-size:11.5px;color:var(--text-faint);margin-top:auto;padding-top:14px;word-break:break-all}
+  .badge{
+    font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+    padding:3px 8px;border-radius:5px;white-space:nowrap;
+  }
+  .badge.wire{background:rgba(94,233,160,.11);color:var(--accent);border:1px solid rgba(94,233,160,.26)}
+  .badge.db{background:rgba(143,176,196,.11);color:var(--steel);border:1px solid rgba(143,176,196,.26)}
+  .badge.fs{background:rgba(240,183,85,.1);color:var(--amber);border:1px solid rgba(240,183,85,.24)}
+  .badge.bonus{background:rgba(148,168,178,.1);color:var(--text-dim);border:1px solid var(--border-2)}
+  .badge.plan{background:rgba(240,183,85,.11);color:var(--amber);border:1px solid rgba(240,183,85,.3)}
+
+  /* backend cards get an identity stripe */
+  .backend{border-top:3px solid var(--bc)}
+  .b-s3{--bc:var(--accent)} .b-db{--bc:var(--steel)} .b-fs{--bc:var(--amber)} .b-ftp{--bc:var(--text-faint)}
+
+  /* ---------- mermaid ---------- */
+  .diagram{
+    background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);
+    padding:24px 18px;overflow-x:auto;
+  }
+  .diagram pre.mermaid{margin:0;text-align:center;min-height:40px}
+  .diagram .mermaid-fallback{
+    display:none;font-family:var(--mono);font-size:12.5px;color:var(--text-dim);
+    white-space:pre;text-align:left;line-height:1.6;
+  }
+  .diagram.failed .mermaid-fallback{display:block}
+  .diagram.failed pre.mermaid{display:none}
+  .cap{font-size:13px;color:var(--text-faint);margin-top:14px;text-align:center}
+  .cap.left{text-align:left}
+
+  /* ---------- contract / rule blocks ---------- */
+  .rule{
+    background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent-dim);
+    border-radius:8px;padding:16px 18px;font-size:14.5px;color:var(--text-dim);
+  }
+  .rule b{color:var(--text)}
+  .rule .k{font-family:var(--mono);color:var(--accent);font-size:13px}
+  .rule.steel{border-left-color:var(--steel-dim)}
+  .rule.steel .k{color:var(--steel)}
+
+  /* ---------- tables ---------- */
+  .tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:640px}
+  th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+  th{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--text-faint);font-weight:500;background:var(--bg-2);white-space:nowrap;
+  }
+  tbody tr:last-child td{border-bottom:none}
+  td.mono,th.mono{font-family:var(--mono);font-size:12.5px}
+  td.mono.accent{color:var(--accent)}
+  .pill{font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap}
+  .pill.ok{background:rgba(94,233,160,.12);color:var(--accent)}
+  .pill.warn{background:rgba(240,183,85,.12);color:var(--amber)}
+  .pill.err{background:rgba(242,139,125,.12);color:var(--rust)}
+  .pill.dim{background:rgba(143,176,196,.12);color:var(--steel)}
+
+  /* ---------- stats ---------- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px}
+  @media(max-width:860px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+  .stat .v{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--text);line-height:1.1}
+  .stat .k{font-size:12.5px;color:var(--text-faint);margin-top:5px}
+  .stat .sub{font-size:11.5px;color:var(--text-faint);margin-top:7px;font-family:var(--mono)}
+
+  /* ---------- code ---------- */
+  .codebox{position:relative}
+  pre.sh,pre.rb{
+    background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);
+    padding:18px 20px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.8;
+    margin:0;color:var(--text);
+  }
+  pre.sh .c,pre.rb .c{color:var(--text-faint)}
+  pre.sh .p{color:var(--accent);user-select:none}
+  pre.sh .f{color:var(--amber)}
+  pre.sh .u{color:var(--steel)}
+  pre.rb .kw{color:var(--accent)}
+  pre.rb .s{color:var(--amber)}
+  .copy{
+    position:absolute;top:10px;right:10px;
+    font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+    padding:5px 10px;border-radius:6px;cursor:pointer;
+    background:var(--surface);border:1px solid var(--border-2);color:var(--text-dim);
+  }
+  .copy:hover{border-color:var(--accent-dim);color:var(--accent)}
+  .copy.done{color:var(--accent);border-color:var(--accent-dim)}
+
+  /* ---------- honesty ---------- */
+  .honest{background:var(--bg-2);border:1px solid var(--border-2);border-radius:var(--radius);padding:24px 26px}
+  .honest h3{font-size:16px;font-weight:600;margin-bottom:6px}
+  .honest ul{margin:14px 0 0;padding-left:20px;font-size:14px;color:var(--text-dim)}
+  .honest li{margin-bottom:9px}
+  .honest li:last-child{margin-bottom:0}
+  .honest b{color:var(--text);font-weight:600}
+  .note{
+    display:inline-block;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase;padding:2px 7px;border-radius:4px;vertical-align:middle;
+    background:rgba(240,183,85,.11);color:var(--amber);border:1px solid rgba(240,183,85,.28);
+  }
+
+  /* ---------- roadmap banner + steps ---------- */
+  .banner{
+    display:flex;gap:14px;align-items:flex-start;
+    background:rgba(240,183,85,.055);border:1px solid rgba(240,183,85,.3);
+    border-radius:var(--radius);padding:16px 20px;margin-bottom:34px;
+    font-size:14.5px;color:var(--text-dim);
+  }
+  .banner b{color:var(--amber)}
+  .banner .ico{font-family:var(--mono);font-size:12px;color:var(--amber);flex:none;padding-top:2px}
+  .steps{display:grid;gap:14px;grid-template-columns:repeat(2,1fr)}
+  @media(max-width:820px){.steps{grid-template-columns:1fr}}
+  .step{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:20px 22px;display:flex;flex-direction:column;
+  }
+  .step .n{
+    font-family:var(--mono);font-size:11px;font-weight:600;color:var(--amber);
+    letter-spacing:.1em;margin-bottom:9px;
+  }
+  .step h3{font-size:16px;font-weight:600;margin-bottom:8px}
+  .step p{font-size:14px;color:var(--text-dim)}
+  .seam{
+    margin-top:auto;padding-top:14px;font-size:12.5px;color:var(--text-faint);
+    border-top:1px solid var(--border);
+  }
+  .seam b{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--steel);font-weight:600}
+  .seam code{color:var(--text-dim)}
+
+  footer{border-top:1px solid var(--border);padding:36px 0 52px;color:var(--text-faint);font-size:13.5px}
+  footer .wrap{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="dot"></span>Simple&nbsp;Drive</a>
+    <nav class="top-nav">
+      <a href="#problem">Problem</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#sigv4">SigV4 signer</a>
+      <a href="#decisions">Decisions</a>
+      <a href="#run">Run it</a>
+      <a href="#scale">Scale it</a>
+      <a href="#verified">Verified</a>
+    </nav>
+    <a class="btn header-cta" href="https://github.com/AbdulAlharbi/simple-drive" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      AbdulAlharbi/simple-drive
+    </a>
+  </div>
+</header>
+
+<!-- ================= HERO ================= -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <div class="eyebrow">Rails blob-storage API · pluggable backends</div>
+    <h1>Simple&nbsp;Drive<span class="accent">.</span></h1>
+    <p class="pitch">
+      One API, <strong>four interchangeable storage backends</strong> — S3-compatible object storage,
+      a database table, the local filesystem, an FTP server — behind a single two-method contract.
+      And S3 is spoken in <strong>raw HTTP</strong>, authenticated by a <strong>hand-rolled AWS Signature
+      V4 signer</strong>: no S3 client, no AWS SDK, nothing but <code>net/http</code>, <code>openssl</code>
+      and the specification.
+    </p>
+    <div class="hero-cta">
+      <a class="btn primary" href="https://github.com/AbdulAlharbi/simple-drive" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        Read the source
+      </a>
+      <a class="btn" href="#run">Run it locally &rarr;</a>
+    </div>
+    <div class="chips">
+      <span class="chip"><span class="pip"></span><b>4</b> interchangeable backends</span>
+      <span class="chip"><span class="pip"></span><b>0</b> AWS / S3 libraries</span>
+      <span class="chip"><span class="pip"></span><b>34</b> tests · <b>72</b> assertions</span>
+      <span class="chip"><span class="pip"></span>SigV4 verified <b>byte-for-byte</b></span>
+      <span class="chip"><span class="pip"></span>Ruby <b>3.3</b> · Rails <b>7.2</b></span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PROBLEM ================= -->
+<section id="problem">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">The problem</div>
+      <h2 class="sec">Not &ldquo;can it store a blob?&rdquo; &mdash; &ldquo;can you swap where it stores it, and sign the request yourself?&rdquo;</h2>
+      <p class="lede">
+        Storing bytes is the easy part. Two constraints make this project actually interesting, and
+        both of them are structural rather than incidental.
+      </p>
+    </div>
+
+    <div class="grid g2">
+      <div class="card">
+        <div class="role">Constraint 1</div>
+        <h3>No S3 libraries — at all <span class="badge wire">the core challenge</span></h3>
+        <p>
+          The brief forbids the AWS SDK and every S3 client. So the S3 backend speaks the S3 REST
+          protocol directly over <code>Net::HTTP</code>, and every request is authenticated by a
+          Signature V4 implementation written from the AWS specification using only
+          <code>openssl</code> and <code>digest</code>. Get one byte of the canonical request wrong —
+          a header out of sort order, a stray space, the wrong percent-encoding — and the service
+          answers <code>403</code> with no explanation of which byte.
+        </p>
+        <p class="file">app/services/storage/sig_v4.rb · app/services/storage/s3_backend.rb</p>
+      </div>
+      <div class="card">
+        <div class="role">Constraint 2</div>
+        <h3>A seam that survives four implementations <span class="badge bonus">open/closed</span></h3>
+        <p>
+          Four backends with genuinely different physics — an HTTP object store, a SQL table, a
+          POSIX filesystem, an FTP session — have to sit behind one interface without leaking a
+          single detail upward. The test of the abstraction isn't that four fit today; it's that
+          the fifth costs <strong>one new class and one factory entry</strong>, with controllers,
+          models, routes and the other backends untouched.
+        </p>
+        <p class="file">app/services/storage.rb · app/services/storage/base_backend.rb</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ARCHITECTURE ================= -->
+<section id="architecture">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow steel">Architecture</div>
+      <h2 class="sec">One request path, one factory, four adapters</h2>
+      <p class="lede">
+        Every request passes the same Bearer filter, lands on one of two endpoints, and reaches
+        storage only through <code>Storage.backend(name)</code>. The controllers never learn which
+        backend is active — and never learn what a backend failure looked like, because the error
+        hierarchy is mapped to HTTP in exactly one place.
+      </p>
+    </div>
+
+    <div class="diagram" data-diagram>
+<pre class="mermaid">
+flowchart LR
+    C(["Client"]) -->|Bearer token| A["Auth filter<br/>secure_compare"]
+    A --> R{"Routes /v1"}
+    R -->|"POST /v1/blobs"| CT["BlobsController#create"]
+    R -->|"GET /v1/blobs/*id"| SH["BlobsController#show"]
+    CT --> M[("blobs<br/>metadata")]
+    SH --> M
+    CT --> F["Storage.backend(name)<br/><b>factory</b>"]
+    SH --> F
+    F --> S3["S3 · raw HTTP + SigV4"]
+    F --> DB[("blob_contents<br/>table")]
+    F --> L["Local filesystem"]
+    F --> FTP["FTP server"]
+</pre>
+      <div class="mermaid-fallback">client --Bearer token--> auth filter (secure_compare)
+                                  |
+                       +----------+-----------+
+                       |                      |
+            POST /v1/blobs            GET /v1/blobs/*id
+        BlobsController#create      BlobsController#show
+                       |                      |
+                       +----> blobs (metadata table) <----+
+                       |                      |
+                       +---> Storage.backend(name)  [factory]
+                                     |
+              +--------------+-------+-------+--------------+
+              |              |               |              |
+        S3 (raw HTTP    blob_contents   local filesystem   FTP server
+         + SigV4)          table</div>
+      <p class="cap">The request lifecycle. <code>create</code> writes to the currently configured backend; <code>show</code> routes to the backend recorded on the blob itself.</p>
+    </div>
+
+    <div style="margin-top:42px">
+      <div class="rule" style="margin-bottom:22px">
+        <b>The whole contract, in two methods.</b>
+        <span class="k">put(id, bytes)</span> persists raw bytes under an opaque identifier;
+        <span class="k">get(id)</span> returns raw bytes or raises <span class="k">Storage::NotFound</span>.
+        Backends never interpret the id, never transform the bytes, and raise only from a shared
+        hierarchy — <span class="k">Storage::Error</span>, <span class="k">NotFound</span>,
+        <span class="k">ConfigurationError</span> — which the base controller maps to
+        <span class="k">502</span> / <span class="k">404</span> / <span class="k">500</span> in one place.
+      </div>
+
+      <div class="grid g2">
+        <article class="card backend b-s3">
+          <div class="role">STORAGE_BACKEND=s3</div>
+          <h3>S3-compatible <span class="badge wire">raw HTTP</span></h3>
+          <p>
+            Path-style addressing (<code>endpoint/bucket/key</code>) over <code>Net::HTTP</code>, signed
+            per request by <code>Storage::SigV4</code>. Path-style keeps one client compatible with AWS S3,
+            minio, DigitalOcean Spaces and Linode Object Storage alike. The object key is the
+            <strong>fully percent-encoded id</strong>, slash included, so every id maps to exactly one
+            unambiguous key segment.
+          </p>
+          <p class="file">s3_backend.rb · from_config validates endpoint, bucket, keys</p>
+        </article>
+
+        <article class="card backend b-db">
+          <div class="role">STORAGE_BACKEND=database</div>
+          <h3>Database table <span class="badge db">separate table</span></h3>
+          <p>
+            Payload bytes land in a dedicated <code>blob_contents</code> table with its own model —
+            never in the tracking table. Hot metadata stays small and fast, and the payload lifecycle
+            is decoupled from the metadata lifecycle.
+          </p>
+          <p class="file">database_backend.rb · db/migrate/*_create_blob_contents.rb</p>
+        </article>
+
+        <article class="card backend b-fs">
+          <div class="role">STORAGE_BACKEND=local</div>
+          <h3>Local filesystem <span class="badge fs">traversal-proof</span></h3>
+          <p>
+            One config value: the root directory. Files are named by the <strong>SHA-256 of the id</strong>,
+            sharded two levels deep to keep directories small, and written to a temp file that is
+            atomically renamed into place — so readers never observe a partial blob and user input
+            never reaches the filesystem as a path.
+          </p>
+          <p class="file">local_backend.rb · root/&lt;aa&gt;/&lt;bb&gt;/&lt;sha256&gt;</p>
+        </article>
+
+        <article class="card backend b-ftp">
+          <div class="role">STORAGE_BACKEND=ftp</div>
+          <h3>FTP server <span class="badge bonus">bonus</span></h3>
+          <p>
+            stdlib <code>net/ftp</code>, one connection per operation, blobs stored under
+            <code>base_dir</code> by SHA-256 name. The connection factory is <strong>injectable</strong>,
+            which is what lets the unit tests drive the whole backend — including the
+            <code>550 → NotFound</code> mapping — with no live server.
+          </p>
+          <p class="file">ftp_backend.rb · ftp_factory: injectable</p>
+        </article>
+      </div>
+    </div>
+
+    <div style="margin-top:42px">
+      <h3 style="font-size:18px;margin-bottom:6px">Data model: metadata and payload never share a table</h3>
+      <p class="lede" style="margin-bottom:22px">
+        The tracking table holds no data. The database <em>backend</em> gets its own table. And every
+        metadata row records <strong>which backend holds its payload</strong> — the single column that
+        makes reconfiguration safe.
+      </p>
+      <div class="diagram" data-diagram>
+<pre class="mermaid">
+erDiagram
+    BLOBS {
+        int id PK
+        string blob_id UK "user-supplied identifier"
+        bigint size "decoded bytes"
+        string backend "which adapter holds the payload"
+        datetime created_at
+    }
+    BLOB_CONTENTS {
+        int id PK
+        string blob_id UK
+        binary data "payload (database backend only)"
+    }
+    BLOBS ||..o| BLOB_CONTENTS : "only when backend = database"
+</pre>
+        <div class="mermaid-fallback">blobs                                blob_contents
+  id            PK                     id       PK
+  blob_id       UK  user-supplied      blob_id  UK
+  size              decoded bytes      data         payload (database backend only)
+  backend           which adapter holds the payload
+  created_at
+
+  blobs ||..o| blob_contents  -- only when backend = "database"</div>
+        <p class="cap">Uniqueness is enforced twice on purpose: an application check gives the friendly <code>409</code> fast path, a database unique index is the real guarantee under concurrency.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SIGV4 ================= -->
+<section id="sigv4">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">The centerpiece</div>
+      <h2 class="sec">AWS Signature V4, written from the specification</h2>
+      <p class="lede">
+        No AWS SDK, no S3 client, no signing gem — <code>Storage::SigV4</code> requires exactly
+        <code>openssl</code> and <code>digest</code>. It builds the canonical request, derives a
+        four-stage scoped signing key, and returns the complete header set including
+        <code>Authorization</code>. It is <strong>not</strong> a rough approximation that happens to
+        work against one server: the test suite reproduces AWS's own documented example signature,
+        byte for byte.
+      </p>
+    </div>
+
+    <div class="diagram" data-diagram>
+<pre class="mermaid">
+flowchart LR
+    CR["Canonical request<br/>method · path · query ·<br/>headers · payload SHA-256"] --> STS["String-to-sign<br/>algorithm · timestamp ·<br/>credential scope · hash"]
+    K1["HMAC('AWS4'+secret, date)"] --> K2["HMAC(·, region)"]
+    K2 --> K3["HMAC(·, service)"]
+    K3 --> K4["HMAC(·, 'aws4_request')"]
+    STS --> SIG["Signature"]
+    K4 --> SIG
+    SIG --> AH["Authorization header"]
+</pre>
+      <div class="mermaid-fallback">canonical request                     string-to-sign
+  method                                AWS4-HMAC-SHA256
+  path (as sent on the wire)            x-amz-date
+  canonical query string                credential scope
+  canonical headers (sorted)            SHA-256(canonical request)
+  signed headers                                |
+  SHA-256(payload)  ---------------------------->|
+                                                 |
+signing key derivation                           |
+  k_date    = HMAC("AWS4"+secret, yyyymmdd)      |
+  k_region  = HMAC(k_date,   region)             |
+  k_service = HMAC(k_region, service)            |
+  k_signing = HMAC(k_service, "aws4_request") ---+
+                                                 |
+                                                 v
+                                      signature -> Authorization header</div>
+      <p class="cap">The derived signing key is scoped to one day, one region, one service — the long-term secret never signs a request directly, so a leaked derived key has minimal blast radius.</p>
+    </div>
+
+    <div class="grid g2" style="margin-top:42px">
+      <div class="card">
+        <div class="role">The proof</div>
+        <h3>AWS's documented example, reproduced exactly</h3>
+        <p style="margin-bottom:14px">
+          The first unit test signs the request from AWS's own &ldquo;Create a signed AWS API request&rdquo;
+          documentation — IAM <code>ListUsers</code>, credentials <code>AKIDEXAMPLE</code>, frozen at
+          <code>2015-08-30T12:36:00Z</code> — and asserts the resulting <code>Authorization</code> header
+          equals the published one. That single equality validates the entire pipeline at once:
+          canonical request, string-to-sign, key derivation and final HMAC.
+        </p>
+        <pre class="rb"><span class="c"># test/services/sig_v4_test.rb — asserted verbatim</span>
+AWS4-HMAC-SHA256
+  Credential=AKIDEXAMPLE/20150830/us-east-1/iam/aws4_request,
+  SignedHeaders=content-type;host;x-amz-date,
+  Signature=<span class="s">5d672d79c15b13162d9279b0855cfba6</span>
+            <span class="s">789a8edb4c82c400e06b5924a6f2b5d7</span></pre>
+      </div>
+      <div class="card">
+        <div class="role">The details that break signatures</div>
+        <h3>Three rules that are easy to get subtly wrong</h3>
+        <p>
+          <strong>Encoding.</strong> <code>SigV4.uri_encode</code> implements RFC 3986 <em>unreserved</em>
+          encoding — everything outside <code>A-Z a-z 0-9 - _ . ~</code> is percent-encoded, operating on
+          bytes so UTF-8 ids encode correctly.
+        </p>
+        <p>
+          <strong>Canonicalisation.</strong> Header names are lower-cased, values trimmed and inner
+          whitespace squeezed, then sorted — because the server recomputes the same string and compares
+          hashes.
+        </p>
+        <p>
+          <strong>Payload hash.</strong> For the <code>s3</code> service the signer adds
+          <code>x-amz-content-sha256</code> to the signed header set, so the body is bound into the
+          signature rather than merely accompanying it.
+        </p>
+        <p class="file">sig_v4.rb · uri_encode · canonicalize_headers · signing_key</p>
+      </div>
+    </div>
+
+    <div class="rule" style="margin-top:22px">
+      <b>Tested on the wire, not just in a unit.</b> <code>test/services/s3_backend_test.rb</code> stands up
+      an <span class="k">in-process fake S3 server</span> and drives the backend at it over
+      <strong>real HTTP</strong> — the fake asserts the SigV4 <code>Authorization</code> header, the payload
+      hash and the percent-encoded object key as they arrive. The backend was then verified end-to-end
+      against a real <a href="https://min.io" target="_blank" rel="noopener">minio</a> server under Docker.
+    </div>
+  </div>
+</section>
+
+<!-- ================= DECISIONS ================= -->
+<section id="decisions">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow steel">Decisions &amp; guarantees</div>
+      <h2 class="sec">Five choices that are correctness or security, not taste</h2>
+      <p class="lede">
+        Each one is a small amount of code doing a specific job, and each has a test that fails if
+        the guarantee is removed.
+      </p>
+    </div>
+
+    <div class="grid g3">
+      <article class="card">
+        <div class="role">Correctness</div>
+        <h3>One transaction, no orphans</h3>
+        <p>
+          The metadata insert and the backend write share a single <code>Blob.transaction</code>. If
+          <code>put</code> raises — S3 unreachable, disk full, FTP refused — the transaction rolls back
+          and no metadata row survives pointing at bytes that were never stored. A
+          <code>409</code> for a duplicate id is checked first, and again caught from the database's
+          unique index for the concurrent case.
+        </p>
+        <p class="file">blobs_controller.rb#create · rollback test in controller tests</p>
+      </article>
+
+      <article class="card">
+        <div class="role">Operability</div>
+        <h3>Backend routing is per blob</h3>
+        <p>
+          Every metadata row records the backend that stored it, and retrieval calls
+          <code>blob.storage</code> — the backend named on <em>that row</em>, not the currently
+          configured one. Switching <code>STORAGE_BACKEND</code> changes where new blobs go and
+          strands nothing: everything written before the change stays retrievable.
+        </p>
+        <p class="file">blob.rb#storage · blobs.backend column</p>
+      </article>
+
+      <article class="card">
+        <div class="role">Security</div>
+        <h3>Ids can't escape the filesystem</h3>
+        <p>
+          The local backend never sanitizes user input into a path — it doesn't use user input as a path
+          at all. The filename is <code>SHA-256(id)</code>, sharded two levels. An id of
+          <code>../../etc/passwd</code> is just another string that hashes to a hex name inside the root,
+          which is asserted directly by a traversal test.
+        </p>
+        <p class="file">local_backend.rb#path_for · traversal test</p>
+      </article>
+
+      <article class="card">
+        <div class="role">Input handling</div>
+        <h3>Strict Base64, or 400</h3>
+        <p>
+          Decoding uses <code>Base64.strict_decode64</code>: canonical Base64 only. A bad alphabet,
+          bad padding or stray whitespace is rejected with <code>400</code> instead of being silently
+          decoded into corrupted bytes. The empty string is deliberately still valid — the empty blob is
+          a real blob, so presence of the <code>data</code> key is checked separately from its emptiness.
+        </p>
+        <p class="file">blobs_controller.rb#decode_base64!</p>
+      </article>
+
+      <article class="card">
+        <div class="role">Auth</div>
+        <h3>Constant-time, and unforgettable</h3>
+        <p>
+          Bearer auth is a <code>before_action</code> on the base controller, so no endpoint can be
+          added that forgets it, and comparison goes through
+          <code>ActiveSupport::SecurityUtils.secure_compare</code> — closing the timing side channel that
+          makes a token guessable byte by byte. Rejections carry a
+          <code>WWW-Authenticate: Bearer</code> header.
+        </p>
+        <p class="file">application_controller.rb#authenticate!</p>
+      </article>
+
+      <article class="card">
+        <div class="role">Interface</div>
+        <h3>Ids stay opaque, all the way down</h3>
+        <p>
+          Ids may be UUIDs, path-like strings or arbitrary unicode. The route is a wildcard
+          (<code>get "blobs/*id", format: false</code>), so slashes and dots survive routing intact
+          rather than being read as nesting or a format extension — and no layer below ever interprets
+          id semantics.
+        </p>
+        <p class="file">config/routes.rb · path-id test</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= RUN ================= -->
+<section id="run">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">Run it</div>
+      <h2 class="sec">Two ways in — local in a minute, or against a real S3 server</h2>
+      <p class="lede">
+        Ruby 3.1+ (<code>.ruby-version</code> targets 3.3). Everything is environment-driven and
+        <code>.env.example</code> documents every variable; the default backend is
+        <code>local</code>, so nothing external is required to see it work.
+      </p>
+    </div>
+
+    <div class="grid g2" style="align-items:start">
+      <div class="codebox">
+        <button class="copy" data-copy>Copy</button>
+        <pre class="sh"><span class="c"># 1 — boot it locally</span>
+<span class="p">$</span> bundle install
+<span class="p">$</span> bin/rails db:prepare
+
+<span class="p">$</span> <span class="u">export</span> SIMPLE_DRIVE_TOKEN=$(openssl rand -hex 32)
+<span class="p">$</span> <span class="u">export</span> STORAGE_BACKEND=local   <span class="c"># local | database | s3 | ftp</span>
+
+<span class="p">$</span> bin/rails server
+
+<span class="c"># 2 — store a blob (Base64 payload, opaque id)</span>
+<span class="p">$</span> curl -X POST http://localhost:3000/v1/blobs \
+    -H <span class="f">"Authorization: Bearer $SIMPLE_DRIVE_TOKEN"</span> \
+    -H <span class="f">"Content-Type: application/json"</span> \
+    -d <span class="f">'{"id": "docs/hello.txt",
+         "data": "SGVsbG8gU2ltcGxlIFN0b3JhZ2UgV29ybGQh"}'</span>
+
+<span class="c"># 201 Created</span>
+<span class="c"># {"id":"docs/hello.txt","size":"27",</span>
+<span class="c">#  "created_at":"2026-08-06T11:18:23Z"}</span>
+
+<span class="c"># 3 — read it back (note the path-like id)</span>
+<span class="p">$</span> curl http://localhost:3000/v1/blobs/docs/hello.txt \
+    -H <span class="f">"Authorization: Bearer $SIMPLE_DRIVE_TOKEN"</span>
+
+<span class="c"># 200 OK — same bytes, re-encoded</span>
+<span class="c"># {"id":"docs/hello.txt","data":"SGVsbG8g...",</span>
+<span class="c">#  "size":"27","created_at":"2026-08-06T11:18:23Z"}</span>
+
+<span class="c"># 4 — the suite: 34 tests, 72 assertions</span>
+<span class="p">$</span> bin/rails test</pre>
+      </div>
+
+      <div>
+        <div class="codebox" style="margin-bottom:18px">
+          <button class="copy" data-copy>Copy</button>
+          <pre class="sh"><span class="c"># Or: the whole thing against a real S3 server</span>
+<span class="p">$</span> docker compose up --build
+
+<span class="c"># brings up three services:</span>
+<span class="c">#   app         :3000   the API (STORAGE_BACKEND=s3)</span>
+<span class="c">#   minio       :9000   a real S3-compatible server</span>
+<span class="c">#   minio-setup         one-shot: creates the bucket</span>
+
+<span class="p">$</span> curl -X POST http://localhost:3000/v1/blobs \
+    -H <span class="f">"Authorization: Bearer dev-token"</span> \
+    -H <span class="f">"Content-Type: application/json"</span> \
+    -d <span class="f">'{"id":"hello",
+         "data":"SGVsbG8gU2ltcGxlIFN0b3JhZ2UgV29ybGQh"}'</span></pre>
+        </div>
+        <p class="cap left" style="margin:0 0 22px">
+          The minio console at <code>localhost:9001</code> (<code>minioadmin</code> / <code>minioadmin</code>)
+          lets you watch objects land in the bucket — put there by the hand-rolled SigV4 client, over
+          real HTTP.
+        </p>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr><th>Status</th><th>When</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="mono"><span class="pill ok">201</span></td><td>blob stored — metadata + payload committed together</td></tr>
+              <tr><td class="mono"><span class="pill ok">200</span></td><td>blob retrieved, re-encoded as Base64</td></tr>
+              <tr><td class="mono"><span class="pill warn">400</span></td><td>invalid Base64, or a missing <code>id</code>&nbsp;/&nbsp;<code>data</code></td></tr>
+              <tr><td class="mono"><span class="pill err">401</span></td><td>missing or wrong Bearer token</td></tr>
+              <tr><td class="mono"><span class="pill dim">404</span></td><td>unknown id, or the backend has no such object</td></tr>
+              <tr><td class="mono"><span class="pill warn">409</span></td><td>id already exists</td></tr>
+              <tr><td class="mono"><span class="pill err">502</span></td><td>backend failure — mapped centrally, no detail leaks</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SCALE / ENTERPRISE ================= -->
+<section id="scale">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow amber">Taking it to production</div>
+      <h2 class="sec">The same seam, at enterprise scale</h2>
+      <p class="lede">
+        A reference implementation earns its keep by being <strong>shaped</strong> like the real thing.
+        Below is how Simple Drive would grow into production infrastructure — and, for each step, the
+        seam <em>that already exists in the code</em> which it hangs off. That's the point: none of this
+        requires reworking the core, because the adapter boundary, the per-blob routing column and the
+        single auth method were put there for exactly this.
+      </p>
+    </div>
+
+    <div class="banner">
+      <span class="ico">▲</span>
+      <div>
+        <b>None of this section is built.</b> Everything below is architecture and roadmap — a design
+        vision for how the current codebase would scale, deliberately labelled as such. What
+        <em>is</em> built and proven is in the <a href="#verified">Verified</a> section, and only there.
+      </div>
+    </div>
+
+    <div class="diagram" data-diagram style="margin-bottom:34px">
+<pre class="mermaid">
+flowchart TB
+    CL(["Clients<br/>per-tenant API tokens"]) --> LB["Load balancer / API gateway<br/>TLS · rate limits · auth edge"]
+    LB --> A1["simple-drive replica 1"]
+    LB --> A2["simple-drive replica 2"]
+    LB --> A3["simple-drive replica N"]
+    A1 --> PG[("Postgres<br/>blob metadata + backend column")]
+    A2 --> PG
+    A3 --> PG
+    A1 --> FAC["Storage factory<br/>same two-method contract"]
+    A2 --> FAC
+    A3 --> FAC
+    FAC --> HOT["S3 · hot tier"]
+    FAC --> COLD["Cheaper object store · cold tier"]
+    FAC --> AZ["Azure Blob / GCS<br/>same adapter recipe"]
+    PG -.-> JOB["Background workers<br/>tiering · replication · dedup"]
+    JOB -.->|"rewrite blobs.backend"| PG
+    JOB -.-> HOT
+    JOB -.-> COLD
+    A1 --> OBS["Structured logs · metrics · traces"]
+    A2 --> OBS
+    A3 --> OBS
+</pre>
+      <div class="mermaid-fallback">clients (per-tenant API tokens)
+        |
+   load balancer / API gateway   -- TLS, rate limits, auth edge
+        |
+   +----+----+----------+
+   |         |          |
+ replica 1  replica 2  replica N     (stateless: no local disk, no session)
+   |         |          |
+   +----+----+----------+
+        |                     \
+   Postgres                    Storage factory  (same two-method contract)
+   blob metadata                    |
+   + backend column          +------+---------+-------------+
+        ^                    |                |             |
+        |               S3 (hot tier)   cold object   Azure Blob / GCS
+        |                                  store      (same adapter recipe)
+        |                          ^          ^
+   background workers -------------+----------+
+   tiering / replication / dedup
+   (rewrite blobs.backend per blob)
+
+ all replicas -> structured logs, metrics, request traces</div>
+      <p class="cap"><b>Target topology — not built.</b> Every box is either a component that exists today or an adapter that plugs into the existing factory.</p>
+    </div>
+
+    <div class="steps">
+      <article class="step">
+        <div class="n">STEP 01</div>
+        <h3>Horizontal replicas behind a load balancer</h3>
+        <p>
+          The API is already stateless: payload lives in the backend, metadata in the database, and no
+          request depends on anything held in a process. Scaling out is adding replicas behind a load
+          balancer — with the caveat that the <code>local</code> backend is the one option that
+          <em>isn't</em> shareable, so production picks an object-store backend.
+        </p>
+        <p class="seam"><b>Existing seam</b> — <code>no per-process state; blobs table is the only coordination point</code></p>
+      </article>
+
+      <article class="step">
+        <div class="n">STEP 02</div>
+        <h3>Per-client tokens and scoped access</h3>
+        <p>
+          The single shared bearer token becomes a per-client credential with scopes — read vs. write,
+          tenant-limited, revocable, rotatable. This is contained work precisely because authentication
+          is <strong>one private method</strong> on the base controller that every endpoint already
+          inherits; the change is inside <code>authenticate!</code>, plus a table of clients.
+        </p>
+        <p class="seam"><b>Existing seam</b> — <code>ApplicationController#authenticate! (single before_action)</code></p>
+      </article>
+
+      <article class="step">
+        <div class="n">STEP 03</div>
+        <h3>DELETE and a paginated list endpoint</h3>
+        <p>
+          <code>delete(id)</code> joins the backend contract, implemented once per adapter, and the
+          controller mirrors create's ordering in reverse — remove the backend bytes first, then the
+          metadata row, so a failure leaves a retrievable blob rather than a dangling record. Listing
+          reads the metadata table alone, so it never touches a backend and paginates cheaply.
+        </p>
+        <p class="seam"><b>Existing seam</b> — <code>Storage::BaseBackend contract · blobs table already carries every listable field</code></p>
+      </article>
+
+      <article class="step">
+        <div class="n">STEP 04</div>
+        <h3>Streaming and multipart uploads</h3>
+        <p>
+          Today <code>put</code> takes a <code>String</code> of bytes, which caps practical object size at
+          what fits in memory. The contract widens to accept an <code>IO</code>, and the S3 adapter grows
+          multipart upload — initiate, sign and send each part, complete. The signer needs no redesign:
+          it already computes a payload hash per request, which is exactly the per-part unit.
+        </p>
+        <p class="seam"><b>Existing seam</b> — <code>S3Backend#request builds raw Net::HTTP requests · SigV4 signs per request</code></p>
+      </article>
+
+      <article class="step">
+        <div class="n">STEP 05</div>
+        <h3>At-rest encryption and per-tenant isolation</h3>
+        <p>
+          Envelope encryption sits at the adapter boundary — encrypt in <code>put</code>, decrypt in
+          <code>get</code>, with keys from a KMS and the key id recorded alongside the metadata. Tenant
+          isolation is a prefix or bucket per tenant, and that's a change to a single private method:
+          each backend already derives its storage location in one place
+          (<code>object_path</code>, <code>path_for</code>, <code>remote_path</code>).
+        </p>
+        <p class="seam"><b>Existing seam</b> — <code>one id→location method per backend · opaque ids, never interpreted</code></p>
+      </article>
+
+      <article class="step">
+        <div class="n">STEP 06</div>
+        <h3>Azure Blob or GCS — the identical recipe</h3>
+        <p>
+          A new provider is <strong>one class and one line</strong>: implement <code>put</code>/<code>get</code>,
+          add an entry to <code>Storage::BACKENDS</code>, write its test. Controllers, models, routes and
+          the four existing backends stay untouched — the property the abstraction was built to have,
+          and the reason the no-SDK constraint didn't cost anything structurally.
+        </p>
+        <p class="seam"><b>Existing seam</b> — <code>Storage::BACKENDS factory hash · adding a backend touches one class</code></p>
+      </article>
+
+      <article class="step">
+        <div class="n">STEP 07</div>
+        <h3>Observability worth paging on</h3>
+        <p>
+          Structured logs with a request id, per-backend latency and error-rate metrics, and traces that
+          span the controller and the outbound backend call. The natural instrumentation points already
+          exist: the storage factory is the one place a backend call originates, and
+          <code>rescue_from</code> is the one place a backend failure becomes an HTTP status.
+        </p>
+        <p class="seam"><b>Existing seam</b> — <code>Storage.backend factory · centralised rescue_from error mapping</code></p>
+      </article>
+
+      <article class="step">
+        <div class="n">STEP 08</div>
+        <h3>Tiering and replication across backends</h3>
+        <p>
+          Hot blobs in S3, cold blobs in cheaper storage, or the same blob replicated across two providers.
+          This is possible <em>only</em> because routing is recorded per blob rather than globally: a
+          background worker copies the bytes, updates <code>blobs.backend</code> for that row, and reads
+          transparently follow — no migration window, no client change, no downtime.
+        </p>
+        <p class="seam"><b>Existing seam</b> — <code>blobs.backend is per-row · blob.storage resolves at read time</code></p>
+      </article>
+
+      <article class="step">
+        <div class="n">STEP 09</div>
+        <h3>Content-addressed storage and dedup</h3>
+        <p>
+          The local backend already names files by <code>SHA-256</code>. Hashing the <em>content</em>
+          instead of the id turns that into content addressing: identical payloads collapse to one stored
+          object, the metadata row keeps the reference count, and a duplicate upload becomes a metadata
+          write with no bytes moved.
+        </p>
+        <p class="seam"><b>Existing seam</b> — <code>BaseBackend#digest_name (SHA-256) shared by local and FTP</code></p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= VERIFIED ================= -->
+<section id="verified">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">Verified &amp; not verified</div>
+      <h2 class="sec">What is proven, and what is deliberately out of scope</h2>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="v">34 / 72</div>
+        <div class="k">tests / assertions</div>
+        <div class="sub">0 failures, 0 skips</div>
+      </div>
+      <div class="stat">
+        <div class="v">2</div>
+        <div class="k">layers under test</div>
+        <div class="sub">unit + integration</div>
+      </div>
+      <div class="stat">
+        <div class="v">every push</div>
+        <div class="k">CI on main &amp; PRs</div>
+        <div class="sub">ubuntu · ruby 3.3</div>
+      </div>
+      <div class="stat">
+        <div class="v">minio</div>
+        <div class="k">real S3 server</div>
+        <div class="sub">verified over the wire</div>
+      </div>
+    </div>
+
+    <div class="grid g2">
+      <div class="honest">
+        <h3 style="color:var(--accent)">Proven, on every run</h3>
+        <p style="font-size:14px;color:var(--text-dim);margin-top:6px">
+          34 tests across <code>test/services/</code> and <code>test/controllers/</code>, green on a clean
+          Linux machine in CI on every push and pull request.
+        </p>
+        <ul>
+          <li><b>The signer is correct, not merely accepted.</b> AWS's officially documented example signature is reproduced byte-for-byte, along with the URI-encoding rules and the S3 payload-hash header.</li>
+          <li><b>S3 is exercised over real HTTP.</b> An in-process fake S3 server receives actual requests and asserts the <code>Authorization</code> header, payload hash and percent-encoded object key <em>on the wire</em> — then the same backend was run against a live minio server under Docker Compose.</li>
+          <li><b>Path traversal cannot escape the root</b> — asserted directly with a hostile id, alongside binary round-trips and unicode ids.</li>
+          <li><b>The transaction boundary holds.</b> A forced backend failure is asserted to leave no orphan metadata row behind.</li>
+          <li><b>Per-blob routing works.</b> A blob written under one backend is retrieved after the configured backend changes.</li>
+          <li><b>The API contract is pinned</b> — exact response shapes, auth rejection, strict-Base64 rejection, missing fields, duplicates, path-like ids and the empty blob.</li>
+        </ul>
+      </div>
+
+      <div class="honest">
+        <h3 style="color:var(--amber)">Not built — a reference implementation, not a hardened service <span class="note">honest limits</span></h3>
+        <p style="font-size:14px;color:var(--text-dim);margin-top:6px">
+          Taken from the repository's own <em>Extending the system</em> section and stated here at the
+          same confidence. These are scope boundaries, not oversights.
+        </p>
+        <ul>
+          <li><b>No DELETE and no list endpoint.</b> The API is store and retrieve; blobs are effectively write-once.</li>
+          <li><b>One shared bearer token, not per-client credentials.</b> There is no notion of a client, a scope, or a tenant — every caller with the token has full access.</li>
+          <li><b>No streaming or multipart.</b> Payloads are Base64 in a JSON body and held in memory, which bounds practical object size; very large objects need the streaming work described above.</li>
+          <li><b>No encryption at rest.</b> Bytes are handed to the backend as-is; confidentiality is whatever the underlying store provides.</li>
+          <li><b>The FTP backend is tested against an injected fake</b> implementing <code>Net::FTP</code>'s transfer interface, including the <code>550 → NotFound</code> mapping — it has not been run against a live FTP server.</li>
+          <li><b>Verified environments are named, not assumed:</b> macOS on Ruby 3.3.4 / Rails 7.2.3 with the local and database backends exercised end-to-end, and Docker (<code>ruby:3.3-slim</code>) against minio for S3.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>Simple Drive — a Rails blob-storage API with four interchangeable backends and a from-scratch SigV4 signer.</div>
+    <div><a href="https://github.com/AbdulAlharbi/simple-drive">github.com/AbdulAlharbi/simple-drive</a></div>
+  </div>
+</footer>
+
+<script>
+  // Copy-to-clipboard for the runnable snippets.
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var pre = btn.parentElement.querySelector('pre');
+      if (!pre) return;
+      var text = pre.innerText.replace(/^\$ /gm, '');
+      navigator.clipboard.writeText(text).then(function () {
+        btn.textContent = 'Copied';
+        btn.classList.add('done');
+        setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1600);
+      }).catch(function () {
+        btn.textContent = 'Press ⌘C';
+        setTimeout(function () { btn.textContent = 'Copy'; }, 1600);
+      });
+    });
+  });
+</script>
+
+<script type="module">
+  // Mermaid from CDN. If the CDN is blocked or rendering fails, every
+  // diagram falls back to its hand-written text version.
+  const styles = getComputedStyle(document.documentElement);
+  const v = n => styles.getPropertyValue(n).trim();
+  try {
+    const { default: mermaid } = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: 'base',
+      fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+      flowchart: { curve: 'basis', padding: 14, nodeSpacing: 34, rankSpacing: 42, useMaxWidth: false },
+      er: { useMaxWidth: false },
+      themeVariables: {
+        background: v('--bg-2'),
+        primaryColor: v('--surface-2'),
+        primaryTextColor: v('--text'),
+        primaryBorderColor: v('--border-2'),
+        secondaryColor: v('--surface'),
+        tertiaryColor: v('--bg-2'),
+        lineColor: '#4d6672',
+        textColor: v('--text-dim'),
+        mainBkg: v('--surface-2'),
+        nodeBorder: v('--border-2'),
+        clusterBkg: v('--bg-2'),
+        edgeLabelBackground: v('--bg-2'),
+        attributeBackgroundColorOdd: v('--surface'),
+        attributeBackgroundColorEven: v('--bg-2'),
+        fontSize: '13px'
+      }
+    });
+    await mermaid.run({ querySelector: 'pre.mermaid' });
+  } catch (err) {
+    console.error('Mermaid failed to render, showing text fallback:', err);
+    document.querySelectorAll('[data-diagram]').forEach(d => d.classList.add('failed'));
+  }
+</script>
+</body>
+</html>

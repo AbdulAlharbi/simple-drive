@@ -4,6 +4,9 @@
 ![Ruby](https://img.shields.io/badge/Ruby-3.3-CC342D?logo=ruby&logoColor=white)
 ![Rails](https://img.shields.io/badge/Rails-7.x-D30001?logo=rubyonrails&logoColor=white)
 ![Tests](https://img.shields.io/badge/tests-34%20passing-success)
+[![Project page](https://img.shields.io/badge/project%20page-simple--drive-5ee9a0)](https://abdulalharbi.github.io/simple-drive/)
+
+**→ [Project page: architecture, the SigV4 signer, and what is verified](https://abdulalharbi.github.io/simple-drive/)**
 
 A Ruby on Rails API that stores and retrieves blobs of data through a single
 interface backed by one of four interchangeable storage backends:
